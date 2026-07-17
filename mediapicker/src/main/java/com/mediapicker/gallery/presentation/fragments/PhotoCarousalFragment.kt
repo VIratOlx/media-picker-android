@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.core.os.BundleCompat
 import android.text.TextUtils
 import android.util.Log
 import android.view.Gravity
@@ -34,7 +35,6 @@ import com.mediapicker.gallery.presentation.viewmodels.BridgeViewModel
 import com.mediapicker.gallery.presentation.viewmodels.HomeViewModel
 import com.mediapicker.gallery.presentation.viewmodels.VideoFile
 import com.mediapicker.gallery.utils.SnackbarUtils
-import java.io.Serializable
 
 private const val PHOTO_PREVIEW = 43475
 
@@ -51,9 +51,9 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
         ): PhotoCarousalFragment {
             return PhotoCarousalFragment().apply {
                 this.arguments = Bundle().apply {
-                    putSerializable(EXTRA_SELECTED_PHOTOS, listOfSelectedPhotos as Serializable)
-                    putSerializable(EXTRA_SELECTED_VIDEOS, listOfSelectedVideos as Serializable)
-                    putSerializable(EXTRA_DEFAULT_PAGE, defaultPageType)
+                    putParcelableArrayList(EXTRA_SELECTED_PHOTOS, ArrayList(listOfSelectedPhotos))
+                    putParcelableArrayList(EXTRA_SELECTED_VIDEOS, ArrayList(listOfSelectedVideos))
+                    putParcelable(EXTRA_DEFAULT_PAGE, defaultPageType)
                 }
             }
         }
@@ -320,7 +320,8 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
         Log.d(TAG, "getPageFromArguments is called")
         this.arguments?.let {
             if (it.containsKey(EXTRA_DEFAULT_PAGE)) {
-                return it.getSerializable(EXTRA_DEFAULT_PAGE) as DefaultPage
+                return BundleCompat.getParcelable(it, EXTRA_DEFAULT_PAGE, DefaultPage::class.java)
+                    ?: DefaultPage.PhotoPage
             }
         }
         return DefaultPage.PhotoPage

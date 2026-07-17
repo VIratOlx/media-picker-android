@@ -3,6 +3,7 @@ package com.mediapicker.gallery.presentation.fragments
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.widget.LinearLayout
+import androidx.core.os.BundleCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.snackbar.Snackbar
 import com.mediapicker.gallery.Gallery
@@ -28,11 +29,17 @@ class GalleryPhotoViewFragment : BaseGalleryViewFragment() {
     private var photoValidationAction: ValidatePhotos = ValidatePhotos()
 
     private val photoAlbum: PhotoAlbum by lazy {
-        arguments?.getSerializable(EXTRA_SELECTED_ALBUM) as PhotoAlbum
+        BundleCompat.getParcelable(
+            requireArguments(), EXTRA_SELECTED_ALBUM, PhotoAlbum::class.java
+        )!!
     }
 
     private val currentSelectedPhotos: LinkedHashSet<PhotoFile> by lazy {
-        arguments?.getSerializable(EXTRA_SELECTED_PHOTO) as LinkedHashSet<PhotoFile>
+        LinkedHashSet(
+            BundleCompat.getParcelableArrayList(
+                requireArguments(), EXTRA_SELECTED_PHOTO, PhotoFile::class.java
+            ) ?: emptyList()
+        )
     }
 
     private val ossFragmentFolderView: OssFragmentFolderViewBinding? by lazy {
@@ -146,8 +153,8 @@ class GalleryPhotoViewFragment : BaseGalleryViewFragment() {
             currentSelectedPhotos: java.util.LinkedHashSet<PhotoFile>
         ) = GalleryPhotoViewFragment().apply {
             arguments = Bundle().apply {
-                this.putSerializable(EXTRA_SELECTED_ALBUM, photoAlbum)
-                this.putSerializable(EXTRA_SELECTED_PHOTO, currentSelectedPhotos)
+                this.putParcelable(EXTRA_SELECTED_ALBUM, photoAlbum)
+                this.putParcelableArrayList(EXTRA_SELECTED_PHOTO, ArrayList(currentSelectedPhotos))
             }
         }
     }
