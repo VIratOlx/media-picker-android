@@ -1,14 +1,11 @@
 package com.mediapicker.gallery.presentation.fragments
 
 import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.core.os.BundleCompat
 import android.view.View
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 import com.mediapicker.gallery.Gallery
 import com.mediapicker.gallery.GalleryConfig
@@ -25,17 +22,9 @@ import com.mediapicker.gallery.presentation.viewmodels.BridgeViewModel
 import com.mediapicker.gallery.presentation.viewmodels.HomeViewModel
 import com.mediapicker.gallery.presentation.viewmodels.VideoFile
 import com.mediapicker.gallery.utils.SnackbarUtils
+import com.olx.permify.Permify
 
 open class HomeFragment : BaseFragment() {
-    private var permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            PermissionsUtil.handlePermissionsResult(
-                requireActivity(),
-                granted,
-                onAllPermissionsGranted = { checkPermissions() },
-                onPermissionDenied = { onPermissionDenied() }
-            )
-        }
 
     private val homeViewModel: HomeViewModel by lazy {
         getFragmentScopedViewModel { HomeViewModel(Gallery.galleryConfig) }
@@ -121,7 +110,7 @@ open class HomeFragment : BaseFragment() {
     }
 
     fun showNeverAskAgainPermission() {
-        //. Toast.makeText(context, R.string.oss_permissions_denied_attach_image, Toast.LENGTH_LONG).show()
+        checkPermission()
         Gallery.galleryConfig?.galleryCommunicator?.onNeverAskPermissionAgain()
     }
 
@@ -212,37 +201,36 @@ open class HomeFragment : BaseFragment() {
     }
 
     private fun requestPermissions() {
-        PermissionsUtil.requestPermissions(requireActivity(), permissionLauncher)
+        PermissionsUtil.requestMediaPermissions(
+            fragment = this,
+            onGranted = { checkPermissions() },
+            onDenied = { onPermissionDenied() },
+            onPermanentlyDenied = { showNeverAskAgainPermission() }
+        )
     }
 
     private fun checkPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            && (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.READ_MEDIA_IMAGES
-            ) == PackageManager.PERMISSION_GRANTED
-                    || ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.READ_MEDIA_VIDEO
-            ) == PackageManager.PERMISSION_GRANTED)
+            && (Permify.isPermissionGranted(requireContext(), Manifest.permission.READ_MEDIA_IMAGES)
+                    || Permify.isPermissionGranted(requireContext(), Manifest.permission.READ_MEDIA_VIDEO))
         ) {
             // Full access on Android 13 (API level 33) or higher
             ossFragmentMainBinding?.permissionAccessManagement?.visibility = View.GONE
         } else if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            ContextCompat.checkSelfPermission(
+            Permify.isPermissionGranted(
                 requireContext(),
                 Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
-            ) == PackageManager.PERMISSION_GRANTED
+            )
         ) {
             // Partial access on Android 14 (API level 34) or higher
             ossFragmentMainBinding?.textView?.text = getString(R.string.photos_partially_granted)
             ossFragmentMainBinding?.button?.text = getString(R.string.allow)
             ossFragmentMainBinding?.permissionAccessManagement?.visibility = View.VISIBLE
-        } else if (ContextCompat.checkSelfPermission(
+        } else if (Permify.isPermissionGranted(
                 requireContext(),
                 Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
+            )
         ) {
             // Full access up to Android 12 (API level 32)
             ossFragmentMainBinding?.permissionAccessManagement?.visibility = View.GONE

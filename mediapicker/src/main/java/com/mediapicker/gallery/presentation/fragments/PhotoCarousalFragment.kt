@@ -2,7 +2,6 @@ package com.mediapicker.gallery.presentation.fragments
 
 import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.core.os.BundleCompat
@@ -12,7 +11,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 import com.mediapicker.gallery.Gallery
 import com.mediapicker.gallery.GalleryConfig
@@ -35,6 +33,7 @@ import com.mediapicker.gallery.presentation.viewmodels.BridgeViewModel
 import com.mediapicker.gallery.presentation.viewmodels.HomeViewModel
 import com.mediapicker.gallery.presentation.viewmodels.VideoFile
 import com.mediapicker.gallery.utils.SnackbarUtils
+import com.olx.permify.Permify
 
 private const val PHOTO_PREVIEW = 43475
 
@@ -59,15 +58,6 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
         }
     }
 
-    private var permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            PermissionsUtil.handlePermissionsResult(
-                requireActivity(),
-                granted,
-                onAllPermissionsGranted = { checkPermissions() },
-                onPermissionDenied = { onPermissionDenied() }
-            )
-        }
     private var photoPreviewLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
@@ -193,6 +183,7 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
 
     private fun showNeverAskAgainPermission() {
         Log.d(TAG, "showNeverAskAgainPermission is called")
+        checkPermission()
         Gallery.galleryConfig?.galleryCommunicator?.onNeverAskPermissionAgain()
     }
 
@@ -397,39 +388,38 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
 
     private fun requestPermissions() {
         Log.d(TAG, "requestPermissions is called")
-        PermissionsUtil.requestPermissions(requireActivity(), permissionLauncher)
+        PermissionsUtil.requestMediaPermissions(
+            fragment = this,
+            onGranted = { checkPermissions() },
+            onDenied = { onPermissionDenied() },
+            onPermanentlyDenied = { showNeverAskAgainPermission() }
+        )
     }
 
     private fun checkPermission() {
         Log.d(TAG, "checkPermission is called")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            && (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.READ_MEDIA_IMAGES
-            ) == PackageManager.PERMISSION_GRANTED
-                    || ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.READ_MEDIA_VIDEO
-            ) == PackageManager.PERMISSION_GRANTED)
+            && (Permify.isPermissionGranted(requireContext(), Manifest.permission.READ_MEDIA_IMAGES)
+                    || Permify.isPermissionGranted(requireContext(), Manifest.permission.READ_MEDIA_VIDEO))
         ) {
             // Full access on Android 13 (API level 33) or higher
             ossFragmentCarousalBinding?.permissionAccessManagement?.visibility = View.GONE
         } else if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            ContextCompat.checkSelfPermission(
+            Permify.isPermissionGranted(
                 requireContext(),
                 Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
-            ) == PackageManager.PERMISSION_GRANTED
+            )
         ) {
             // Partial access on Android 14 (API level 34) or higher
             ossFragmentCarousalBinding?.textView?.text =
                 getString(R.string.photos_partially_granted)
             ossFragmentCarousalBinding?.button?.text = getString(R.string.allow)
             ossFragmentCarousalBinding?.permissionAccessManagement?.visibility = View.VISIBLE
-        } else if (ContextCompat.checkSelfPermission(
+        } else if (Permify.isPermissionGranted(
                 requireContext(),
                 Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
+            )
         ) {
             // Full access up to Android 12 (API level 32)
             ossFragmentCarousalBinding?.permissionAccessManagement?.visibility = View.GONE
