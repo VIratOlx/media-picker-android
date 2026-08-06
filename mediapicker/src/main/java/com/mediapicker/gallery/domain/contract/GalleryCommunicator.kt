@@ -25,6 +25,8 @@ interface IGalleryCommunicator{
 
     fun onNeverAskPermissionAgain()
 
+//    fun onShowPermissionRationale(permissionRequest: PermissionRequestWrapper)
+
     fun onStepValidate(isValid: Boolean)
 
     fun takePicture()
@@ -78,6 +80,10 @@ internal class GalleryCommunicatorDefaultImpl : IGalleryCommunicator{
     override fun onNeverAskPermissionAgain() {
         //Need Implementation
     }
+
+//    override fun onShowPermissionRationale(permissionRequest: PermissionRequestWrapper) {
+//        //Need Implementation
+//    }
 
     override fun onStepValidate(isValid: Boolean) {
         //Need Implementation

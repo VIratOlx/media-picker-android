@@ -1,34 +1,46 @@
 package com.mediapicker.gallery.presentation.utils
 
 import android.Manifest
-import android.content.Context
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
+import com.mediapicker.gallery.R
 import com.olx.permify.Permify
-import com.olx.permify.callback.PermanentPermissionDeniedCallback
-import com.olx.permify.callback.PermissionDeniedCallback
 import com.olx.permify.callback.PermissionRequestCallback
+import com.olx.permify.callback.RationalPermissionCallback
 
 object PermissionsUtil {
 
-    fun requiredPermissions(): List<String> {
+    private const val REQUEST_CODE_PERMISSION = 1001
+
+    private fun getRequiredPermissions(): Array<String> {
         return when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> listOf(
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> arrayOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.READ_MEDIA_IMAGES,
                 Manifest.permission.READ_MEDIA_VIDEO,
                 Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
             )
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> listOf(
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.READ_MEDIA_IMAGES,
                 Manifest.permission.READ_MEDIA_VIDEO
             )
-            Build.VERSION.SDK_INT > Build.VERSION_CODES.Q -> listOf(
+            Build.VERSION.SDK_INT > Build.VERSION_CODES.Q -> arrayOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.READ_EXTERNAL_STORAGE
             )
-            else -> listOf(
+            else -> arrayOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -36,58 +48,106 @@ object PermissionsUtil {
         }
     }
 
-    fun isMediaAccessGranted(context: Context): Boolean {
-        return when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-                Permify.isPermissionGranted(
-                    context,
-                    Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
-                ) -> true
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
-                Permify.isPermissionGranted(context, Manifest.permission.READ_MEDIA_IMAGES) ||
-                    Permify.isPermissionGranted(context, Manifest.permission.READ_MEDIA_VIDEO)
-            else ->
-                Permify.isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-    }
-
-    fun requestMediaPermissions(
+    fun requestPermissions(
         fragment: Fragment,
-        onGranted: () -> Unit,
-        onDenied: () -> Unit,
-        onPermanentlyDenied: () -> Unit
+        onAllPermissionsGranted: () -> Unit,
+        onPermissionDenied: () -> Unit
     ) {
-        val context = fragment.requireContext()
-
+        val permissions = getRequiredPermissions()
         Permify.requestPermission(
             fragment = fragment,
-            permissions = requiredPermissions(),
+            permissions = permissions.toList(),
             showDialogs = false,
+            rationalPermissionCallback = object : RationalPermissionCallback {
+                override fun onRationalPermissionCallback(temporaryPermissionDenied: List<String>) {
+                }
+            },
             permissionRequestCallback = object : PermissionRequestCallback {
                 override fun onResult(
                     allGranted: Boolean,
                     grantedList: List<String>,
                     deniedList: List<String>
                 ) {
-                    if (allGranted || isMediaAccessGranted(context)) {
-                        onGranted()
+                    val grantedMap = permissions.associateWith { permission ->
+                        grantedList.contains(permission)
                     }
-                }
-            },
-            permissionDeniedCallback = object : PermissionDeniedCallback {
-                override fun onPermissionDenied(permissionDeniedList: List<String>) {
-                    if (!isMediaAccessGranted(context)) {
-                        onDenied()
-                    }
-                }
-            },
-            permanentPermissionDeniedCallback = object : PermanentPermissionDeniedCallback {
-                override fun onPermanentPermissionDenied(permanentPermissionDenied: List<String>) {
-                    if (!isMediaAccessGranted(context)) {
-                        onPermanentlyDenied()
-                    }
+                    handlePermissionsResult(
+                        fragment.requireActivity(),
+                        grantedMap,
+                        onAllPermissionsGranted,
+                        onPermissionDenied
+                    )
                 }
             }
         )
+    }
+
+    fun handlePermissionsResult(
+        activity: FragmentActivity,
+        granted: Map<String, Boolean>,
+        onAllPermissionsGranted: () -> Unit,
+        onPermissionDenied: () -> Unit
+    ) {
+        val allPermissionsGranted = granted.all { it.value }
+        // Special case for Android 14 (API level 34) and newer
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val isReadMediaVisualUserSelectedGranted = ContextCompat.checkSelfPermission(
+                activity,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (isReadMediaVisualUserSelectedGranted) {
+                onAllPermissionsGranted()
+            } else {
+                handleDeniedPermissions(activity, granted, onPermissionDenied)
+            }
+        } else {
+            if (allPermissionsGranted) {
+                onAllPermissionsGranted()
+            } else {
+                handleDeniedPermissions(activity, granted, onPermissionDenied)
+            }
+        }
+    }
+
+    private fun handleDeniedPermissions(
+        activity: FragmentActivity,
+        granted: Map<String, Boolean>,
+        onPermissionDenied: () -> Unit
+    ) {
+        val deniedPermissions = granted.filter { !it.value }.keys
+
+        deniedPermissions.forEach { permission ->
+            if (!ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)) {
+                showNeverAskAgainPermission(activity)
+                return
+            }
+        }
+
+        onPermissionDenied()
+    }
+
+    private fun showNeverAskAgainPermission(activity: FragmentActivity) {
+        Toast.makeText(activity, activity.getString(R.string.permissions_denied_never_ask_again), Toast.LENGTH_LONG).show()
+
+        AlertDialog.Builder(activity)
+            .setTitle(activity.getString(R.string.permissions_required_title))
+            .setMessage(activity.getString(R.string.permissions_required_message))
+            .setPositiveButton(activity.getString(R.string.settings)) { _, _ ->
+                openAppSettings(activity)
+            }
+            .setNegativeButton(activity.getString(R.string.cancel), null)
+            .show()
+    }
+
+    fun showPermissionRationale(activity: AppCompatActivity) {
+        Toast.makeText(activity, activity.getString(R.string.permissions_denied_rationale), Toast.LENGTH_LONG).show()
+    }
+
+    fun openAppSettings(context: Activity) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
+        context.startActivity(intent)
     }
 }
