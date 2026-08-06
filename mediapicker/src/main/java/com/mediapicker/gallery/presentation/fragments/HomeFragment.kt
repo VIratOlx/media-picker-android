@@ -4,11 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.core.os.BundleCompat
 import android.view.View
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.os.BundleCompat
 import com.google.android.material.snackbar.Snackbar
 import com.mediapicker.gallery.Gallery
 import com.mediapicker.gallery.GalleryConfig
@@ -27,16 +26,6 @@ import com.mediapicker.gallery.presentation.viewmodels.VideoFile
 import com.mediapicker.gallery.utils.SnackbarUtils
 
 open class HomeFragment : BaseFragment() {
-    private var permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            PermissionsUtil.handlePermissionsResult(
-                requireActivity(),
-                granted,
-                onAllPermissionsGranted = { checkPermissions() },
-                onPermissionDenied = { onPermissionDenied() }
-            )
-        }
-
     private val homeViewModel: HomeViewModel by lazy {
         getFragmentScopedViewModel { HomeViewModel(Gallery.galleryConfig) }
     }
@@ -212,7 +201,11 @@ open class HomeFragment : BaseFragment() {
     }
 
     private fun requestPermissions() {
-        PermissionsUtil.requestPermissions(requireActivity(), permissionLauncher)
+        PermissionsUtil.requestPermissions(
+            fragment = this,
+            onAllPermissionsGranted = { checkPermissions() },
+            onPermissionDenied = { onPermissionDenied() }
+        )
     }
 
     private fun checkPermission() {

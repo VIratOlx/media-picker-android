@@ -59,15 +59,6 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
         }
     }
 
-    private var permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            PermissionsUtil.handlePermissionsResult(
-                requireActivity(),
-                granted,
-                onAllPermissionsGranted = { checkPermissions() },
-                onPermissionDenied = { onPermissionDenied() }
-            )
-        }
     private var photoPreviewLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
@@ -397,7 +388,11 @@ open class PhotoCarousalFragment : BaseFragment(), GalleryPagerCommunicator,
 
     private fun requestPermissions() {
         Log.d(TAG, "requestPermissions is called")
-        PermissionsUtil.requestPermissions(requireActivity(), permissionLauncher)
+        PermissionsUtil.requestPermissions(
+            fragment = this,
+            onAllPermissionsGranted = { checkPermissions() },
+            onPermissionDenied = { onPermissionDenied() }
+        )
     }
 
     private fun checkPermission() {
